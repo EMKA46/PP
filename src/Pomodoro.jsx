@@ -1,10 +1,12 @@
 import { useState, useRef } from "react";
 import styled from "styled-components";
+import keyframes from "styled-components";
 
 export function Pomodoro() {
   const [count, setCount] = useState(12);
-  const [isRunning, setIsRunning] = useState(false); // ← добавляем флаг
+  const [isRunning, setIsRunning] = useState(false); // Состояние для отслеживания, запущен ли таймер
   const timerRef = useRef(null);
+  const [mode, setMode] = useState("pomodoro");
 
   function handleStartPause() {
     if (isRunning) {
@@ -12,10 +14,10 @@ export function Pomodoro() {
       setIsRunning(false);
     } else {
       timerRef.current = setInterval(() => {
-        setCount(prev => {
+        setCount((prev) => {
           if (prev <= 0) {
             clearInterval(timerRef.current);
-            setIsRunning(false);//говорим чтоб кнопка после окончание таймера была в изначальном состоянии start
+            setIsRunning(false); //говорим чтоб кнопка после окончание таймера была в изначальном состоянии start
             return 12; // Сброс таймера на 12 секунд после завершения счетчика
           }
           return prev - 1;
@@ -25,8 +27,16 @@ export function Pomodoro() {
     }
   }
 
+  function timeToFocus() {
+    if (mode === "pomodoro") {
+      return "Time to focus!";
+    } else {
+      return "Time for a break!";
+    }
+  }
+
   return (
-    <PomodoroForm>
+    <PomodoroForm mode={mode}>
       <Header>
         <HeaderChange>
           <div>
@@ -54,22 +64,41 @@ export function Pomodoro() {
         <div>
           <MainContent>
             <BreakButtonContainer>
-              <BreakButton>Pomodoro</BreakButton>
-              <BreakButton>Short Break</BreakButton>
-              <BreakButton>Long Break</BreakButton>
+              <BreakButton
+                mode={mode}
+                selected="pomodoro"
+                onClick={() => setMode("pomodoro")}
+              >
+                Pomodoro
+              </BreakButton>
+              <BreakButton
+                mode={mode}
+                selected="short"
+                onClick={() => setMode("short")}
+              >
+                Short Break
+              </BreakButton>
+              <BreakButton
+                mode={mode}
+                selected="long"
+                onClick={() => setMode("long")}
+              >
+                Long Break
+              </BreakButton>
             </BreakButtonContainer>
             <TimerContainer>
-              <Timer>00:{count.toString().padStart(2, "0")}</Timer> {/* тут я делаю так чтобы добавлялся ноль если число по длине меньше 2 значений */}
+              <Timer>00:{count.toString().padStart(2, "0")}</Timer>{" "}
+              {/* тут я делаю так чтобы добавлялся ноль если число по длине меньше 2 значений */}
             </TimerContainer>
             <StartContainer>
-              <StartButton onClick={handleStartPause}>
+              <StartButton onClick={handleStartPause} mode={mode}>
                 {isRunning ? "PAUSE" : "START"}
               </StartButton>
             </StartContainer>
           </MainContent>
           <Footer>
             <FooterP>#7</FooterP>
-            <FooterP2>Time to focus!</FooterP2>
+            <FooterP2>{timeToFocus()}</FooterP2>
           </Footer>
         </div>
       </Main>
@@ -99,7 +128,14 @@ const Footer = styled.div`
 const StartButton = styled.button`
   width: 200px;
   height: 55px;
-  color: #ba4a49;
+  color: ${(props) => {
+    if (props.mode === "short") return "#38868a";
+    {
+      if (props.mode === "long") return "#397097";
+      return "#ba4a49";
+    }
+  }};
+  transition: color 0.6s ease;
   border: none;
   border-radius: 5px;
   font-size: 21px;
@@ -144,8 +180,12 @@ const BreakButton = styled.button`
   color: white;
   border-radius: 5px;
   cursor: pointer;
-  background-color: rgba(255, 255, 255, 0);
+  padding: 5px 10px;
+  background-color: ${(props) =>
+    props.mode === props.selected ? "rgba(0, 0, 0, 0.2)" : "transparent"};
+  transition: background-color 0.3s ease;
   font-size: 17px;
+  margin-top: 30px;
 `;
 
 const Main = styled.div`
@@ -160,13 +200,20 @@ const MainContent = styled.div`
   width: 480px;
   height: 350px;
   border-radius: 10px;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.1);
 `;
 
 const PomodoroForm = styled.div`
   width: 100%;
   height: 100vh;
-  background-color: #ba4a49;
+  background-color: ${(props) => {
+    if (props.mode === "short") return "#38868a";
+    {
+      if (props.mode === "long") return "#397097";
+      return "#ba4a49";
+    }
+  }};
+  transition: background-color 0.6s ease;
   display: flex;
   flex-direction: column;
 `;
