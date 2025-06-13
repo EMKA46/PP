@@ -1,12 +1,12 @@
-import React from 'react';
-import { Pomodoro } from './Pomodoro';
+import React from "react";
+import { Pomodoro } from "./Pomodoro";
 function App() {
 
   return (
- <div>
-    <Pomodoro />
- </div>
-  )
+    <div>
+      <Pomodoro />
+    </div>
+  );
 }
 
-export default App
+export default App;

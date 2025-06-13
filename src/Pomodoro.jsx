@@ -1,45 +1,118 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
-import keyframes from "styled-components";
+import { Settings } from "./components/Settings";
+import { CustomTimer } from "./components/testingTimer";
 
 export function Pomodoro() {
-  const [count, setCount] = useState(12);
-  const [isRunning, setIsRunning] = useState(false); // Состояние для отслеживания, запущен ли таймер
-  const timerRef = useRef(null);
-  const [mode, setMode] = useState("pomodoro");
+  const [mode, setMode] = useState("pomodoro"); //отвечает за режим таймера breaks (short long)
+  const [showSettings, setShowSettings] = useState(false); //отвечает за отображение модалки настроек
+  const [isRunning, setIsRunning] = useState(false); //отвечает за запуск таймера false означает что таймер стоит
+  const [timerKey, setTimerKey] = useState(0); //отвечает за перезапуск таймера в случае изменения таймера в настройках
+  const [longBreakInterval, setLongBreakInterval] = useState(4);
+  const [pomodoroCount, setPomodoroCount] = useState(0);
 
-  function handleStartPause() {
+  const [autoStartPomodoros, setAutoStartPomodoros] = useState(false);
+  const [autoStartBreaks, setAutoStartBreaks] = useState(false);
+
+  const [modeTimes, setModeTimes] = useState({
+    pomodoro: 2,
+    short: 5 * 60,
+    long: 15 * 60,
+  });
+  const [currentTime, setCurrentTime] = useState(modeTimes[mode]);
+  const [timeLeft, setTimeLeft] = useState(modeTimes[mode]);
+  const progress = ((modeTimes[mode] - timeLeft) / modeTimes[mode]) * 100;
+
+  const audioRef = useRef(null);
+  useEffect(() => {
     if (isRunning) {
-      clearInterval(timerRef.current);
-      setIsRunning(false);
+      audioRef.current.play();
     } else {
-      timerRef.current = setInterval(() => {
-        setCount((prev) => {
-          if (prev <= 0) {
-            clearInterval(timerRef.current);
-            setIsRunning(false); //говорим чтоб кнопка после окончание таймера была в изначальном состоянии start
-            return 12; // Сброс таймера на 12 секунд после завершения счетчика
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      setIsRunning(true); //говорим чтоб кнопка была в состоянии pause пока идет таймер
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      clickRef.current.currentTime = 0;
+      clickRef.current.play();
     }
-  }
+  }, [isRunning]);
 
-  function timeToFocus() {
+  const clickRef = useRef(
+    new Audio("/knopka-vyiklyucheniya-na-nastolnoy-lampe1.mp3")
+  );
+  const alarmSoundRef = useRef(new Audio("/budilnik1.mp3"));
+
+  const handleStartPause = () => {
+    // проигрываем звук
+    clickRef.current.currentTime = 0;
+    clickRef.current.play();
+
+    // переключаем состояние
+    setIsRunning((prev) => !prev);
+  };
+
+  const handleTimerComplete = () => {
+    // останавливаем звук таймера (если он играет)
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+
+    // проигрываем звук будильника (окончание таймера)
+    alarmSoundRef.current.currentTime = 0;
+    alarmSoundRef.current.play();
     if (mode === "pomodoro") {
-      return "Time to focus!";
+      // увеличиваем счётчик завершённых pomodoro
+      const newCount = pomodoroCount + 1;
+      setPomodoroCount(newCount);
+
+      if (newCount % longBreakInterval === 0) {
+        // если пришло время длинного перерыва
+        setMode("long");
+        setCurrentTime(modeTimes.long);
+      } else {
+        // иначе короткий перерыв
+        setMode("short");
+        setCurrentTime(modeTimes.short);
+      }
+
+      // автозапуск перерыва если нужно
+      if (autoStartBreaks) setIsRunning(true);
+      else setIsRunning(false);
     } else {
-      return "Time for a break!";
+      // если сейчас на перерыве (короткий или длинный)
+      // после перерыва начинаем Pomodoro заново и сбрасываем счётчик, если это long break
+      if (mode === "long") {
+        setPomodoroCount(0);
+      }
+      setMode("pomodoro");
+      setCurrentTime(modeTimes.pomodoro);
+      if (autoStartPomodoros) setIsRunning(true);
+      else setIsRunning(false);
     }
-  }
+
+    setTimerKey((k) => k + 1);
+  };
+
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    setCurrentTime(modeTimes[newMode]);
+    setIsRunning(false);
+    setTimerKey((prev) => prev + 1);
+
+    if (newMode === "pomodoro") {
+      setPomodoroCount(0);
+    }
+  };
+
+  const timeToFocus = () => {
+    return mode === "pomodoro" ? "Time to focus!" : "Time for a break!";
+  };
+  useEffect(() => {
+    setCurrentTime(modeTimes[mode]);
+  }, [modeTimes, mode]);
 
   return (
-    <PomodoroForm mode={mode}>
-      <Header>
-        <HeaderChange>
-          <div>
+    <>
+      <PomodoroForm mode={mode}>
+        <Header>
+          <HeaderChange>
             <Title>
               <StyledImage
                 src="https://pomofocus.io/images/icon-white2.png"
@@ -47,64 +120,95 @@ export function Pomodoro() {
               />
               Pomofocus
             </Title>
+            <HeaderButton>
+              <StyledButton onClick={() => setShowSettings(true)}>
+                <SettingsImg
+                  src="https://pomofocus.io/icons/config-white.png"
+                  alt=""
+                />
+                Setting
+              </StyledButton>
+              <StyledButtonI>︙</StyledButtonI>
+            </HeaderButton>
+          </HeaderChange>
+          <Snake>
+            <SnakeFill $progress={progress} />
+          </Snake>
+        </Header>
+        <Main>
+          <div>
+            <MainContent>
+              <BreakButtonContainer>
+                <BreakButton
+                  mode={mode}
+                  selected="pomodoro"
+                  onClick={() => handleModeChange("pomodoro")}
+                >
+                  Pomodoro
+                </BreakButton>
+                <BreakButton
+                  mode={mode}
+                  selected="short"
+                  onClick={() => handleModeChange("short")}
+                >
+                  Short Break
+                </BreakButton>
+                <BreakButton
+                  mode={mode}
+                  selected="long"
+                  onClick={() => handleModeChange("long")}
+                >
+                  Long Break
+                </BreakButton>
+              </BreakButtonContainer>
+              <Timer>
+                <CustomTimer
+                  key={timerKey} //чтобы обновлялся при изменении в настройках
+                  initialTime={currentTime}
+                  isRunning={isRunning}
+                  onComplete={handleTimerComplete}
+                  onTick={setTimeLeft}
+                />
+              </Timer>
+              <StartContainer>
+                <StartButton onClick={handleStartPause} mode={mode}>
+                  {isRunning ? "PAUSE" : "START"}
+                </StartButton>
+              </StartContainer>
+            </MainContent>
+            <Footer>
+              <FooterP>#7</FooterP>
+              <FooterP2>{timeToFocus()}</FooterP2>
+            </Footer>
           </div>
-          <HeaderButton>
-            <StyledButton>
-              <SettingsImg
-                src="https://pomofocus.io/icons/config-white.png"
-                alt=""
-              />
-              Setting
-            </StyledButton>
-            <StyledButtonI>︙</StyledButtonI>
-          </HeaderButton>
-        </HeaderChange>
-      </Header>
-      <Main>
-        <div>
-          <MainContent>
-            <BreakButtonContainer>
-              <BreakButton
-                mode={mode}
-                selected="pomodoro"
-                onClick={() => setMode("pomodoro")}
-              >
-                Pomodoro
-              </BreakButton>
-              <BreakButton
-                mode={mode}
-                selected="short"
-                onClick={() => setMode("short")}
-              >
-                Short Break
-              </BreakButton>
-              <BreakButton
-                mode={mode}
-                selected="long"
-                onClick={() => setMode("long")}
-              >
-                Long Break
-              </BreakButton>
-            </BreakButtonContainer>
-            <TimerContainer>
-              <Timer>00:{count.toString().padStart(2, "0")}</Timer>{" "}
-              {/* тут я делаю так чтобы добавлялся ноль если число по длине меньше 2 значений */}
-            </TimerContainer>
-            <StartContainer>
-              <StartButton onClick={handleStartPause} mode={mode}>
-                {isRunning ? "PAUSE" : "START"}
-              </StartButton>
-            </StartContainer>
-          </MainContent>
-          <Footer>
-            <FooterP>#7</FooterP>
-            <FooterP2>{timeToFocus()}</FooterP2>
-          </Footer>
-        </div>
-      </Main>
-    </PomodoroForm>
+        </Main>
+      </PomodoroForm>
+
+      {showSettings && (
+        <Settings
+          OnClose={() => setShowSettings(false)}
+          modeTimes={modeTimes}
+          setModeTimes={setModeTimes}
+          autoStartPomodoros={autoStartPomodoros}
+          setAutoStartPomodoros={setAutoStartPomodoros}
+          autoStartBreaks={autoStartBreaks}
+          setAutoStartBreaks={setAutoStartBreaks}
+          longBreakInterval={longBreakInterval}
+          setLongBreakInterval={setLongBreakInterval}
+        />
+      )}
+      <audio
+        ref={audioRef}
+        src="/clock-clock-sound-clock-clock-time-10343.mp3" // укажи путь к своему аудио
+        loop // зациклить звук
+        preload="auto"
+      />
+    </>
   );
 }
+
+// Все стили остаются без изменений
+
 const FooterP = styled.p`
   font-size: 17px;
   color: rgba(255, 255, 255, 0.6);
@@ -153,16 +257,13 @@ const StartContainer = styled.div`
   margin-top: 20px;
 `;
 
-const TimerContainer = styled.div`
+const Timer = styled.h1`
+  font-size: 70px;
   width: 100%;
-  height: 140px;
+  height: 200px;
   display: flex;
   justify-content: center;
-  margin-top: 20px;
-`;
-
-const Timer = styled.h1`
-  font-size: 130px;
+  align-items: center;
   color: white;
 `;
 
@@ -221,8 +322,11 @@ const Header = styled.div`
   width: 100%;
   height: 30px;
   display: flex;
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
   margin-top: 20px;
+  position: relative;
 `;
 const HeaderChange = styled.div`
   width: 620px;
@@ -231,8 +335,32 @@ const HeaderChange = styled.div`
   justify-content: space-between;
   align-items: start;
   gap: 100px;
-  border-bottom: 1px solid rgba(000, 0, 0, 0.1);
+  padding: 0px;
+  margin: 0px;
 `;
+const Snake = styled.div`
+  position: absolute;
+  left: 458px;
+  top:46px;            
+  width: 620px;          
+  height: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);  
+`;
+
+/* белая «заливка», ширина = процент прогресса */
+const SnakeFill = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 5px;
+  width: ${({ $progress }) => `${$progress}%`};
+  background: rgba(255, 255, 255, 0.9);
+`;
+
 const HeaderButton = styled.div`
   display: flex;
   flex-direction: row;
